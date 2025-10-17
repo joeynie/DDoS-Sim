@@ -1,0 +1,52 @@
+version: '3.8'
+
+services:
+  attacker:
+    build: ./attacker
+    hostname: attacker
+    container_name: attacker
+    cap_add:
+      - NET_ADMIN
+    networks:
+      attack_net:
+        ipv4_address: 10.10.10.10
+
+  victim:
+    build: ./victim
+    hostname: victim
+    container_name: victim
+    # 将nginx的80端口映射到主机的8080端口，方便我们观察
+    ports:
+      - "8080:80"
+    privileged: true
+    command: sh -c "/usr/local/bin/weaken-defenses.sh && nginx -g 'daemon off;'"
+    networks:
+      victim_net:
+        ipv4_address: 10.10.20.20
+
+
+  defender:
+    build: ./defender
+    hostname: defender
+    container_name: defender
+    # 启用特权模式，否则无法修改内核网络参数和iptables
+    privileged: true
+    sysctls:
+      - net.ipv4.ip_forward=1
+    networks:
+      attack_net:
+        ipv4_address: 10.10.10.5
+      victim_net:
+        ipv4_address: 10.10.20.5
+
+networks:
+  attack_net:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 10.10.10.0/24
+  victim_net:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 10.10.20.0/24
