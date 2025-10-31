@@ -19,7 +19,6 @@ services:
     ports:
       - "8080:80"
     privileged: true
-    command: sh -c "/usr/local/bin/weaken-defenses.sh && nginx -g 'daemon off;'"
     networks:
       victim_net:
         ipv4_address: 10.10.20.20
