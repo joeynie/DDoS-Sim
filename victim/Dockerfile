@@ -1,6 +1,6 @@
 FROM nginx:alpine
 
-RUN apk update && apk add --no-cache tcpdump iproute2 apache2-utils
+RUN apk update && apk add --no-cache tcpdump iproute2 apache2-utils bash
 RUN apk add --no-cache python3 py3-pip
 RUN pip3 install --break-system-packages flask
 
@@ -13,6 +13,7 @@ COPY app.py /app/app.py
 WORKDIR /app
 
 COPY start.sh /start.sh
-RUN chmod +x /start.sh
+COPY setup_victim.sh /app/setup_victim.sh
+RUN chmod +x /start.sh /app/setup_victim.sh
 EXPOSE 80
 CMD ["/start.sh"]
