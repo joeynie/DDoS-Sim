@@ -15,9 +15,9 @@ services:
     build: ./victim
     hostname: victim
     container_name: victim
-    # 将nginx的80端口映射到主机的8080端口，方便我们观察
+    # 将nginx的80端口映射到主机的8888端口，方便我们观察
     ports:
-      - "8080:80"
+      - "8888:80"
     privileged: true
     networks:
       victim_net:

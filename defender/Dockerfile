@@ -6,4 +6,4 @@ RUN apt-get update && apt-get install -y iptables iproute2 procps iputils-ping
 COPY start-defender.sh /usr/local/bin/start-defender.sh
 RUN chmod +x /usr/local/bin/start-defender.sh
 
-CMD ["/usr/local/bin/start-defender.sh"]
+CMD ["sh", "/usr/local/bin/start-defender.sh"]

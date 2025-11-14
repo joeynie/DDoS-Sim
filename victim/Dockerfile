@@ -16,4 +16,4 @@ COPY start.sh /start.sh
 COPY setup_victim.sh /app/setup_victim.sh
 RUN chmod +x /start.sh /app/setup_victim.sh
 EXPOSE 80
-CMD ["/start.sh"]
+CMD ["sh", "/start.sh"]
