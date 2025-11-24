@@ -10,7 +10,6 @@ RUN pip3 install scapy requests
 COPY attack.py /app/attack.py
 COPY http_flood.py /app/http_flood.py
 COPY hping_attack.sh /app/hping_attack.sh
-COPY setup_victim.sh /app/setup_victim.sh
 COPY simulated_reflection_attack.py /app/simulated_reflection_attack.py
 COPY monitor_response.py /app/monitor_response.py
 RUN chmod +x /app/simulated_reflection_attack.py

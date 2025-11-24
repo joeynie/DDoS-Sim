@@ -17,7 +17,7 @@ if [ "$MODE" = "vulnerable" ]; then
     echo ""
     
     # 应用易受攻击的参数
-    sysctl -w net.ipv4.tcp_max_syn_backlog=128
+    sysctl -w net.ipv4.tcp_max_syn_backlog=1
     sysctl -w net.ipv4.tcp_synack_retries=6
     sysctl -w net.ipv4.tcp_syn_retries=6
     sysctl -w net.ipv4.tcp_syncookies=0
