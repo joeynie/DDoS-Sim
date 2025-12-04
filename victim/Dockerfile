@@ -17,8 +17,5 @@ WORKDIR /app
 
 COPY start.sh /start.sh
 COPY setup_victim.sh /app/setup_victim.sh
-COPY monitor_bandwidth.py /app/monitor_bandwidth.py
-COPY monitor_bandwidth.sh /app/monitor_bandwidth.sh
-RUN chmod +x /start.sh /app/setup_victim.sh /app/monitor_bandwidth.sh
 EXPOSE 80 9999/udp
 CMD ["sh", "/start.sh"]

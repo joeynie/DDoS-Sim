@@ -30,6 +30,8 @@ iptables -A FORWARD -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT
 # 允许从攻击网络到受害者网络的流量
 iptables -A FORWARD -i eth0 -o eth1 -j ACCEPT
 
+iptables -A FORWARD -i eth1 -o eth0 -j ACCEPT
+
 # ======================================================================
 # 【防御规则区域】
 # 在这里添加你的DDoS防御规则。

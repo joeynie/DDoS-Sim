@@ -63,6 +63,12 @@ python3 udp_amplification_9999.py 10.10.20.20 50 60 100
 docker-compose down
 ```
 
+### 在defender上实时获取收到的所有包的信息
+注：请单开一个终端，运行以下代码；同时可以在原终端中攻击，查看结果
+docker-compose up -d --build
+docker exec -it defender bash
+python3 packet_monitor.py -i eth0
+
 ## 功能特性
 
 ### 🤖 僵尸网络攻击 (最新)

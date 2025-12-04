@@ -99,6 +99,17 @@ services:
       attack_net:
         ipv4_address: 10.10.10.10
 
+  # 正常用户模拟器
+  user:
+    build: ./user
+    hostname: user
+    container_name: user
+    cap_add:
+      - NET_ADMIN
+    networks:
+      attack_net:
+        ipv4_address: 10.10.10.20
+
   victim:
     build: ./victim
     hostname: victim
