@@ -1,34 +1,43 @@
 #!/bin/bash
 
-echo "Starting Defender Gateway..."
+echo "=========================================="
+echo "  NFTables 防御系统启动中..."
+echo "=========================================="
 
-# 1. 开启内核的IP转发功能，这是作为路由器的前提
-echo "Enabling IP forwarding..."
+# 1. 开启内核的IP转发功能
+echo "[1/6] 启用IP转发..."
 sysctl -w net.ipv4.ip_forward=1
 
-# 2. 清空所有现有的iptables规则，确保一个干净的环境
-echo "Flushing existing iptables rules..."
-iptables -F
-iptables -t nat -F
-iptables -X
+# 2. 配置连接追踪参数
+echo "[2/6] 配置连接追踪参数..."
+# 增加连接追踪表大小
+sysctl -w net.netfilter.nf_conntrack_max=1000000 2>/dev/null || true
+# 减少TIME_WAIT超时
+sysctl -w net.ipv4.tcp_fin_timeout=30 2>/dev/null || true
+# 启用SYN cookies
+sysctl -w net.ipv4.tcp_syncookies=1 2>/dev/null || true
+# 减少SYN-ACK重试次数
+sysctl -w net.ipv4.tcp_synack_retries=2 2>/dev/null || true
+# 增加SYN队列长度
+sysctl -w net.ipv4.tcp_max_syn_backlog=65535 2>/dev/null || true
+# 启用TCP时间戳
+sysctl -w net.ipv4.tcp_timestamps=1 2>/dev/null || true
 
-# 3. 设置默认策略：允许所有输入输出，但默认丢弃所有转发流量
-# 这是安全的做法，我们只允许我们明确定义的流量通过
-iptables -P INPUT ACCEPT
-iptables -P OUTPUT ACCEPT
-iptables -P FORWARD DROP
+# 3. 清空现有规则
+echo "[3/6] 清空现有防火墙规则..."
+nft flush ruleset 2>/dev/null || true
+iptables -F 2>/dev/null || true
+iptables -t nat -F 2>/dev/null || true
 
-# 4. 设置NAT（网络地址转换）
-# 让从victim_net出去的包（即victim的响应包）能够伪装成defender的地址，
-# 这样响应才能正确返回给attacker
-echo "Setting up NAT masquerade..."
+# 4. 设置基本NAT（使用iptables，因为nftables的NAT需要额外配置）
+echo "[4/6] 配置NAT..."
 iptables -t nat -A POSTROUTING -o eth1 -j MASQUERADE
 
-# 5. 设置转发规则，允许双向流量通过
-# 允许已建立的连接和相关流量通过，这是所有有状态防火墙的基础
-iptables -A FORWARD -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT
-# 允许从攻击网络到受害者网络的流量
-iptables -A FORWARD -i eth0 -o eth1 -j ACCEPT
+# 5. 应用NFTables防御规则
+echo "[5/6] 应用NFTables防御规则..."
+cd /app
+python3 -c "
+from nftables_config import DefenseConfig, NFTablesManager
 
 iptables -A FORWARD -i eth1 -o eth0 -j ACCEPT
 
@@ -43,10 +52,44 @@ iptables -A FORWARD -i eth1 -o eth0 -j ACCEPT
 # iptables -A FORWARD -i eth0 -p tcp --syn -m limit --limit 10/s --limit-burst 20 -j ACCEPT
 # iptables -A FORWARD -i eth0 -p tcp --syn -j DROP
 # ======================================================================
+# 创建默认配置
+config = DefenseConfig()
 
-echo "Defender is running. Forwarding rules are set."
-echo "Current iptables FORWARD chain:"
-iptables -L FORWARD -v -n
+# 可以在这里自定义初始参数
+# config.syn_defense.rate_limit = 100
+# config.udp_defense.per_ip_rate = 50
 
-# 保持容器在前台运行，否则脚本执行完容器会退出
-tail -f /dev/null
+# 创建管理器并应用规则
+manager = NFTablesManager(config)
+success = manager.apply_rules()
+
+if success:
+    print('NFTables规则应用成功!')
+    # 保存配置
+    config.save()
+else:
+    print('NFTables规则应用失败!')
+    exit(1)
+"
+
+# 6. 启动API服务
+echo "[6/6] 启动防御API服务..."
+echo ""
+echo "=========================================="
+echo "  防御系统已启动"
+echo "  API地址: http://0.0.0.0:5000"
+echo "=========================================="
+echo ""
+echo "可用API端点:"
+echo "  GET  /api/health        - 健康检查"
+echo "  GET  /api/params        - 获取所有参数"
+echo "  GET  /api/params/ranges - 获取参数范围"
+echo "  POST /api/params/update - 更新参数"
+echo "  GET  /api/stats         - 获取统计信息"
+echo "  POST /api/rules/apply   - 应用规则"
+echo "  GET  /api/rl/state      - 获取RL状态"
+echo "  POST /api/rl/action     - 应用RL动作"
+echo ""
+
+# 启动Flask API服务
+python3 /app/defense_api.py --host 0.0.0.0 --port 5000
