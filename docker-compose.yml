@@ -131,9 +131,6 @@ services:
     # 暴露防御API端口
     ports:
       - "5001:5000"  # 防御系统API
-    sysctls:
-      - net.ipv4.ip_forward=1
-      - net.netfilter.nf_conntrack_max=1000000
     cap_add:
       - NET_ADMIN
       - SYS_ADMIN

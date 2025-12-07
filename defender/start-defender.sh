@@ -8,20 +8,24 @@ echo "=========================================="
 echo "[1/6] 启用IP转发..."
 sysctl -w net.ipv4.ip_forward=1
 
-# 2. 配置连接追踪参数
+# 2. 配置连接追踪参数（在Windows Docker Desktop中某些参数可能不可用）
 echo "[2/6] 配置连接追踪参数..."
 # 增加连接追踪表大小
-sysctl -w net.netfilter.nf_conntrack_max=1000000 2>/dev/null || true
+if sysctl -w net.netfilter.nf_conntrack_max=1000000 2>/dev/null; then
+    echo "  ✓ 连接追踪表大小已设置"
+else
+    echo "  ⚠ 无法设置 nf_conntrack_max (可能在Windows Docker中不支持，将使用默认值)"
+fi
 # 减少TIME_WAIT超时
-sysctl -w net.ipv4.tcp_fin_timeout=30 2>/dev/null || true
+sysctl -w net.ipv4.tcp_fin_timeout=30 2>/dev/null || echo "  ⚠ 无法设置 tcp_fin_timeout"
 # 启用SYN cookies
-sysctl -w net.ipv4.tcp_syncookies=1 2>/dev/null || true
+sysctl -w net.ipv4.tcp_syncookies=1 2>/dev/null || echo "  ⚠ 无法设置 tcp_syncookies"
 # 减少SYN-ACK重试次数
-sysctl -w net.ipv4.tcp_synack_retries=2 2>/dev/null || true
+sysctl -w net.ipv4.tcp_synack_retries=2 2>/dev/null || echo "  ⚠ 无法设置 tcp_synack_retries"
 # 增加SYN队列长度
-sysctl -w net.ipv4.tcp_max_syn_backlog=65535 2>/dev/null || true
+sysctl -w net.ipv4.tcp_max_syn_backlog=65535 2>/dev/null || echo "  ⚠ 无法设置 tcp_max_syn_backlog"
 # 启用TCP时间戳
-sysctl -w net.ipv4.tcp_timestamps=1 2>/dev/null || true
+sysctl -w net.ipv4.tcp_timestamps=1 2>/dev/null || echo "  ⚠ 无法设置 tcp_timestamps"
 
 # 3. 清空现有规则
 echo "[3/6] 清空现有防火墙规则..."
@@ -37,23 +41,10 @@ iptables -t nat -A POSTROUTING -o eth1 -j MASQUERADE
 echo "[5/6] 应用NFTables防御规则..."
 cd /app
 python3 -c "
-from nftables_config import DefenseConfig, NFTablesManager
+from nftables_config import RLDefenseConfig, NFTablesManager
 
-iptables -A FORWARD -i eth1 -o eth0 -j ACCEPT
-
-# ======================================================================
-# 【防御规则区域】
-# 在这里添加你的DDoS防御规则。
-# 默认情况下，这里是空的，流量可以自由通过。
-#
-# --- 示例：SYN Flood防御规则（默认注释掉） ---
-# 限制进入eth0（来自attacker）的SYN包，每秒最多10个，突发不超过20个
-# echo "Applying SYN Flood protection..."
-# iptables -A FORWARD -i eth0 -p tcp --syn -m limit --limit 10/s --limit-burst 20 -j ACCEPT
-# iptables -A FORWARD -i eth0 -p tcp --syn -j DROP
-# ======================================================================
 # 创建默认配置
-config = DefenseConfig()
+config = RLDefenseConfig()
 
 # 可以在这里自定义初始参数
 # config.syn_defense.rate_limit = 100

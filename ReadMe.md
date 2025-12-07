@@ -69,6 +69,21 @@ docker-compose up -d --build
 docker exec -it defender bash
 python3 packet_monitor.py -i eth0
 
+### 控制 NFTables 防御 (手动/API)
+
+防御 API 默认运行在宿主机端口 5001。
+
+查看当前防御统计 (包含 F1 Score):
+```bash
+curl http://localhost:5001/api/stats
+```
+手动调整防御参数 (模拟 RL 动作)的示例:
+```bash
+curl -X POST http://localhost:5001/api/params/update \
+  -H "Content-Type: application/json" \
+  -d '{"batch":{"global_limit":5000,"single_ip_limit":50}}'
+```
+
 ## 功能特性
 
 ### 🤖 僵尸网络攻击 (最新)
