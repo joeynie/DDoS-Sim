@@ -1,92 +1,30 @@
 version: '3.8'
 
 services:
-  # C&C控制服务器
-  c2_server:
-    build: ./c2_server
-    hostname: c2
-    container_name: c2_server
-    ports:
-      - "5000:5000"  # Web控制面板
-    networks:
-      attack_net:
-        ipv4_address: 10.10.10.2
+  # # C&C控制服务器
+  # c2_server:
+  #   build: ./c2_server
+  #   hostname: c2
+  #   container_name: c2_server
+  #   ports:
+  #     - "5000:5000"  # Web控制面板
+  #   networks:
+  #     attack_net:
+  #       ipv4_address: 10.10.10.2
 
-  # 僵尸网络节点 (5个bot)
-  bot1:
-    build: ./bot
-    hostname: bot1
-    container_name: bot1
-    cap_add:
-      - NET_ADMIN
-    environment:
-      - BOT_ID=bot_001
-      - C2_SERVER=http://10.10.10.2:5000
-    depends_on:
-      - c2_server
-    networks:
-      attack_net:
-        ipv4_address: 10.10.10.11
-
-  bot2:
-    build: ./bot
-    hostname: bot2
-    container_name: bot2
-    cap_add:
-      - NET_ADMIN
-    environment:
-      - BOT_ID=bot_002
-      - C2_SERVER=http://10.10.10.2:5000
-    depends_on:
-      - c2_server
-    networks:
-      attack_net:
-        ipv4_address: 10.10.10.12
-
-  bot3:
-    build: ./bot
-    hostname: bot3
-    container_name: bot3
-    cap_add:
-      - NET_ADMIN
-    environment:
-      - BOT_ID=bot_003
-      - C2_SERVER=http://10.10.10.2:5000
-    depends_on:
-      - c2_server
-    networks:
-      attack_net:
-        ipv4_address: 10.10.10.13
-
-  bot4:
-    build: ./bot
-    hostname: bot4
-    container_name: bot4
-    cap_add:
-      - NET_ADMIN
-    environment:
-      - BOT_ID=bot_004
-      - C2_SERVER=http://10.10.10.2:5000
-    depends_on:
-      - c2_server
-    networks:
-      attack_net:
-        ipv4_address: 10.10.10.14
-
-  bot5:
-    build: ./bot
-    hostname: bot5
-    container_name: bot5
-    cap_add:
-      - NET_ADMIN
-    environment:
-      - BOT_ID=bot_005
-      - C2_SERVER=http://10.10.10.2:5000
-    depends_on:
-      - c2_server
-    networks:
-      attack_net:
-        ipv4_address: 10.10.10.15
+  # # 僵尸网络节点 - 使用 scale 动态扩展
+  # bot:
+  #   build: ./bot
+  #   cap_add:
+  #     - NET_ADMIN
+  #   environment:
+  #     - C2_SERVER=http://10.10.10.2:5000
+  #   depends_on:
+  #     - c2_server
+  #   networks:
+  #     - attack_net
+  #   deploy:
+  #     replicas: 5  # 定义bot数量，可随时修改
 
   # 原有的attacker容器（保留用于单点攻击测试）
   attacker:
@@ -121,6 +59,23 @@ services:
     networks:
       victim_net:
         ipv4_address: 10.10.20.20
+    deploy:
+      resources:
+        limits:
+          memory: "64M"     # 限制内存
+          cpus: "0.2"       # 限制CPU
+
+  # victim_flask:
+  #   build: ./victim_flask
+  #   hostname: victim_flask
+  #   container_name: victim_flask
+  #   ports:
+  #     - "9998:80"  # 映射到主机的 9999 端口
+  #   cap_add:
+  #     - NET_ADMIN  # 需要权限添加静态路由
+  #   networks:
+  #     victim_net:
+  #       ipv4_address: 10.10.20.30 # 分配同一个网段的不同IP
 
   defender:
     build: ./defender

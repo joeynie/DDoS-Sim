@@ -215,8 +215,26 @@ class BotAgent:
             if self.attacker:
                 self.attacker.stop()
 
+def generate_bot_id():
+    """
+    自动生成唯一的 Bot ID
+    优先使用环境变量，否则使用 hostname 作为标识
+    Docker Compose 的 replicas 会为每个副本生成唯一的 hostname
+    """
+    # 如果有手动设置的 BOT_ID，优先使用
+    env_bot_id = os.environ.get('BOT_ID')
+    if env_bot_id and env_bot_id != 'bot_unknown':
+        return env_bot_id
+    
+    # 使用容器的 hostname（Docker Compose replicas 会自动分配唯一的 hostname）
+    hostname = socket.gethostname()
+    
+    # hostname 通常是容器 ID 的前12位，格式如 "ddos-sim-bot-1"
+    # 或者是短容器 ID 如 "a1b2c3d4e5f6"
+    return f"bot-{hostname}"
+
 def main():
-    bot_id = os.environ.get('BOT_ID', 'bot_unknown')
+    bot_id = generate_bot_id()
     c2_url = os.environ.get('C2_SERVER', 'http://10.10.10.2:5000')
     
     print("=" * 60)

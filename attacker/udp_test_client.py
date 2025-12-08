@@ -144,23 +144,22 @@ def main():
         print("\n示例:")
         print("  # 发送10个包测试")
         print("  python3 udp_test_client.py 10.10.20.20")
-        print("  python3 udp_test_client.py 10.10.20.20 test 20 0.5")
+        print("  python3 udp_test_client.py 10.10.20.20 test 9999 0.5")
         print()
         print("  # 持续ping测试")
         print("  python3 udp_test_client.py 10.10.20.20 ping")
-        print("  python3 udp_test_client.py 10.10.20.20 ping 0.2")
+        print("  python3 udp_test_client.py 10.10.20.20 ping 9999 0.2")
         sys.exit(1)
     
     target_ip = sys.argv[1]
     mode = sys.argv[2] if len(sys.argv) > 2 else "test"
+    target_port = int(sys.argv[3]) if len(sys.argv) > 3 else 9999
+    interval = float(sys.argv[4]) if len(sys.argv) > 4 else 1.0
     
     if mode == "ping":
-        interval = float(sys.argv[3]) if len(sys.argv) > 3 else 1.0
-        continuous_test(target_ip, 9999, interval)
+        continuous_test(target_ip, target_port, interval)
     else:
-        num_packets = int(sys.argv[3]) if len(sys.argv) > 3 else 10
-        interval = float(sys.argv[4]) if len(sys.argv) > 4 else 0.5
-        test_udp_connection(target_ip, 9999, num_packets, interval)
+        test_udp_connection(target_ip, target_port, 10, interval)
 
 if __name__ == "__main__":
     main()

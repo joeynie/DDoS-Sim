@@ -1,0 +1,348 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NetShield | 防御监控中心</title>
+    <link rel="stylesheet" href="/static/css/style.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+</head>
+<body>
+    <!-- 侧边导航 -->
+    <nav class="sidebar">
+        <div class="logo">
+            <div class="logo-icon">◈</div>
+            <span>NetShield</span>
+        </div>
+        <ul class="nav-menu">
+            <li class="nav-item active" data-section="overview">
+                <span class="nav-icon">◉</span>
+                <span>总览</span>
+            </li>
+            <li class="nav-item" data-section="rules">
+                <span class="nav-icon">⚙</span>
+                <span>规则配置</span>
+            </li>
+            <li class="nav-item" data-section="traffic">
+                <span class="nav-icon">◫</span>
+                <span>流量监控</span>
+            </li>
+            <li class="nav-item" data-section="blacklist">
+                <span class="nav-icon">⊘</span>
+                <span>黑名单</span>
+            </li>
+        </ul>
+        <div class="nav-footer">
+            <div class="status-indicator">
+                <span class="status-dot"></span>
+                <span id="connection-status">连接中...</span>
+            </div>
+        </div>
+    </nav>
+
+    <!-- 主内容区 -->
+    <main class="main-content">
+        <!-- 顶部栏 -->
+        <header class="topbar">
+            <div class="topbar-left">
+                <h1 id="page-title">系统总览</h1>
+            </div>
+            <div class="topbar-right">
+                <div class="refresh-control">
+                    <label>自动刷新</label>
+                    <select id="refresh-interval">
+                        <option value="1000">1秒</option>
+                        <option value="2000" selected>2秒</option>
+                        <option value="5000">5秒</option>
+                        <option value="0">关闭</option>
+                    </select>
+                </div>
+                <button class="btn btn-outline" id="btn-refresh">
+                    ↻ 刷新
+                </button>
+            </div>
+        </header>
+
+        <!-- 总览页面 -->
+        <section id="section-overview" class="content-section active">
+            <!-- 状态卡片 -->
+            <div class="stat-cards">
+                <div class="stat-card">
+                    <div class="stat-header">
+                        <span class="stat-label">真阳性 (TP)</span>
+                        <span class="stat-badge badge-success">拦截攻击</span>
+                    </div>
+                    <div class="stat-value" id="stat-tp">0<span class="stat-total">/ 0</span></div>
+                    <div class="stat-trend" id="trend-tp">0/s</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-header">
+                        <span class="stat-label">假阳性 (FP)</span>
+                        <span class="stat-badge badge-warning">误拦正常</span>
+                    </div>
+                    <div class="stat-value" id="stat-fp">0<span class="stat-total">/ 0</span></div>
+                    <div class="stat-trend" id="trend-fp">0/s</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-header">
+                        <span class="stat-label">真阴性 (TN)</span>
+                        <span class="stat-badge badge-info">放行正常</span>
+                    </div>
+                    <div class="stat-value" id="stat-tn">0<span class="stat-total">/ 0</span></div>
+                    <div class="stat-trend" id="trend-tn">0/s</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-header">
+                        <span class="stat-label">假阴性 (FN)</span>
+                        <span class="stat-badge badge-danger">漏放攻击</span>
+                    </div>
+                    <div class="stat-value" id="stat-fn">0<span class="stat-total">/ 0</span></div>
+                    <div class="stat-trend" id="trend-fn">0/s</div>
+                </div>
+            </div>
+
+            <!-- 性能指标 -->
+            <div class="metrics-row">
+                <div class="metric-card metric-precision">
+                    <div class="metric-ring">
+                        <svg viewBox="0 0 100 100">
+                            <circle class="ring-bg" cx="50" cy="50" r="45"/>
+                            <circle class="ring-fill" id="ring-precision" cx="50" cy="50" r="45"/>
+                        </svg>
+                        <div class="metric-value" id="metric-precision">0%</div>
+                    </div>
+                    <div class="metric-label">精确率 Precision</div>
+                </div>
+                <div class="metric-card metric-recall">
+                    <div class="metric-ring">
+                        <svg viewBox="0 0 100 100">
+                            <circle class="ring-bg" cx="50" cy="50" r="45"/>
+                            <circle class="ring-fill" id="ring-recall" cx="50" cy="50" r="45"/>
+                        </svg>
+                        <div class="metric-value" id="metric-recall">0%</div>
+                    </div>
+                    <div class="metric-label">召回率 Recall</div>
+                </div>
+                <div class="metric-card metric-f1">
+                    <div class="metric-ring">
+                        <svg viewBox="0 0 100 100">
+                            <circle class="ring-bg" cx="50" cy="50" r="45"/>
+                            <circle class="ring-fill" id="ring-f1" cx="50" cy="50" r="45"/>
+                        </svg>
+                        <div class="metric-value" id="metric-f1">0%</div>
+                    </div>
+                    <div class="metric-label">F1 分数</div>
+                </div>
+            </div>
+
+            <!-- 实时流量图 -->
+            <div class="chart-container">
+                <div class="chart-header">
+                    <h3>实时流量趋势</h3>
+                    <div class="chart-legend">
+                        <span class="legend-item"><span class="legend-dot dot-tp"></span>TP</span>
+                        <span class="legend-item"><span class="legend-dot dot-fp"></span>FP</span>
+                        <span class="legend-item"><span class="legend-dot dot-tn"></span>TN</span>
+                        <span class="legend-item"><span class="legend-dot dot-fn"></span>FN</span>
+                    </div>
+                </div>
+                <div class="chart-wrapper">
+                    <canvas id="overview-chart"></canvas>
+                </div>
+            </div>
+        </section>
+
+        <!-- 规则配置页面 -->
+        <section id="section-rules" class="content-section">
+            <div class="config-panel">
+                <div class="panel-header">
+                    <h3>防御规则参数</h3>
+                    <p class="panel-desc">调整 NFTables 防火墙规则参数，变更会立即生效</p>
+                </div>
+                <div class="config-grid">
+                    <!-- 全局流量限速 -->
+                    <div class="config-item">
+                        <div class="config-label">
+                            <span class="config-name">全局流量限速</span>
+                            <span class="config-unit">packets/sec</span>
+                        </div>
+                        <div class="config-control">
+                            <input type="range" id="param-global_limit" min="1000" max="100000" step="1000">
+                            <input type="number" class="config-input" id="input-global_limit">
+                        </div>
+                        <div class="config-range">
+                            <span>1,000</span>
+                            <span>100,000</span>
+                        </div>
+                    </div>
+
+                    <!-- 单IP连接速率 -->
+                    <div class="config-item">
+                        <div class="config-label">
+                            <span class="config-name">单IP连接速率</span>
+                            <span class="config-unit">packets/sec</span>
+                        </div>
+                        <div class="config-control">
+                            <input type="range" id="param-single_ip_limit" min="10" max="5000" step="10">
+                            <input type="number" class="config-input" id="input-single_ip_limit">
+                        </div>
+                        <div class="config-range">
+                            <span>10</span>
+                            <span>5,000</span>
+                        </div>
+                    </div>
+
+                    <!-- 并发连接数限制 -->
+                    <div class="config-item">
+                        <div class="config-label">
+                            <span class="config-name">并发连接数</span>
+                            <span class="config-unit">connections</span>
+                        </div>
+                        <div class="config-control">
+                            <input type="range" id="param-conn_limit" min="10" max="1000" step="10">
+                            <input type="number" class="config-input" id="input-conn_limit">
+                        </div>
+                        <div class="config-range">
+                            <span>10</span>
+                            <span>1,000</span>
+                        </div>
+                    </div>
+
+                    <!-- 封禁阈值 -->
+                    <div class="config-item">
+                        <div class="config-label">
+                            <span class="config-name">封禁阈值</span>
+                            <span class="config-unit">packets/sec</span>
+                        </div>
+                        <div class="config-control">
+                            <input type="range" id="param-ban_threshold" min="1" max="100" step="1">
+                            <input type="number" class="config-input" id="input-ban_threshold">
+                        </div>
+                        <div class="config-range">
+                            <span>1</span>
+                            <span>100</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="config-actions">
+                    <button class="btn btn-secondary" id="btn-reset-rules">
+                        重置默认
+                    </button>
+                    <button class="btn btn-primary" id="btn-apply-rules">
+                        应用规则
+                    </button>
+                </div>
+            </div>
+
+            <!-- 规则预览 -->
+            <div class="rules-preview">
+                <div class="panel-header">
+                    <h3>规则预览</h3>
+                    <button class="btn btn-outline btn-sm" id="btn-preview-rules">刷新预览</button>
+                </div>
+                <pre id="rules-code"><code>点击"刷新预览"查看生成的 NFTables 规则</code></pre>
+            </div>
+        </section>
+
+        <!-- 流量监控页面 -->
+        <section id="section-traffic" class="content-section">
+            <div class="traffic-charts">
+                <div class="chart-panel">
+                    <div class="chart-header">
+                        <h3>拦截/放行比例</h3>
+                    </div>
+                    <div class="chart-wrapper">
+                        <canvas id="traffic-pie-chart"></canvas>
+                    </div>
+                </div>
+                <div class="chart-panel wide">
+                    <div class="chart-header">
+                        <h3>流量时序分析</h3>
+                    </div>
+                    <div class="chart-wrapper">
+                        <canvas id="traffic-line-chart"></canvas>
+                    </div>
+                </div>
+            </div>
+
+            <div class="traffic-table-container">
+                <div class="panel-header">
+                    <h3>流量详情</h3>
+                </div>
+                <table class="data-table">
+                    <thead>
+                        <tr>
+                            <th>指标</th>
+                            <th>实时增量 / 累计总量</th>
+                            <th>描述</th>
+                        </tr>
+                    </thead>
+                    <tbody id="traffic-table-body">
+                        <tr>
+                            <td>TP (真阳性)</td>
+                            <td id="table-tp"><span class="table-delta">0</span> <span class="table-total">/ 0</span></td>
+                            <td>正确拦截的恶意流量</td>
+                        </tr>
+                        <tr>
+                            <td>FP (假阳性)</td>
+                            <td id="table-fp"><span class="table-delta">0</span> <span class="table-total">/ 0</span></td>
+                            <td>误拦截的正常流量</td>
+                        </tr>
+                        <tr>
+                            <td>TN (真阴性)</td>
+                            <td id="table-tn"><span class="table-delta">0</span> <span class="table-total">/ 0</span></td>
+                            <td>正确放行的正常流量</td>
+                        </tr>
+                        <tr>
+                            <td>FN (假阴性)</td>
+                            <td id="table-fn"><span class="table-delta">0</span> <span class="table-total">/ 0</span></td>
+                            <td>未能拦截的恶意流量</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </section>
+
+        <!-- 黑名单页面 -->
+        <section id="section-blacklist" class="content-section">
+            <div class="blacklist-controls">
+                <div class="panel-header">
+                    <h3>IP黑名单管理</h3>
+                </div>
+                <div class="blacklist-form">
+                    <input type="text" id="blacklist-ip" placeholder="输入IP地址 (如: 10.10.10.100)">
+                    <input type="number" id="blacklist-timeout" placeholder="超时(秒)" value="300">
+                    <button class="btn btn-primary" id="btn-add-blacklist">添加到黑名单</button>
+                </div>
+            </div>
+
+            <div class="blacklist-stats">
+                <div class="bl-stat-card">
+                    <div class="bl-stat-value" id="blacklist-count">0</div>
+                    <div class="bl-stat-label">黑名单IP数量</div>
+                </div>
+                <div class="bl-stat-card">
+                    <div class="bl-stat-value" id="auto-banned-count">0</div>
+                    <div class="bl-stat-label">自动封禁数量</div>
+                </div>
+            </div>
+
+            <div class="whitelist-section">
+                <div class="panel-header">
+                    <h3>白名单管理</h3>
+                </div>
+                <div class="blacklist-form">
+                    <input type="text" id="whitelist-ip" placeholder="输入IP地址">
+                    <button class="btn btn-secondary" id="btn-add-whitelist">添加到白名单</button>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <!-- 通知容器 -->
+    <div id="toast-container"></div>
+
+    <script src="/static/js/app.js"></script>
+</body>
+</html>

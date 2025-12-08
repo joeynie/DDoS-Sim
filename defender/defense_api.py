@@ -4,16 +4,22 @@ NFTables 防御系统 HTTP API
 提供 RESTful 接口供强化学习网络调用
 """
 
-from flask import Flask, request, jsonify
+from flask import Flask, request, jsonify, render_template, send_from_directory
 from nftables_config import RLDefenseConfig, NFTablesManager
 import threading
 import time
 import logging
+import os
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
 
-app = Flask(__name__)
+# 获取当前文件所在目录
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+
+app = Flask(__name__, 
+            template_folder=os.path.join(BASE_DIR, 'templates'),
+            static_folder=os.path.join(BASE_DIR, 'static'))
 
 # 全局管理器实例
 config = RLDefenseConfig()
@@ -22,6 +28,19 @@ manager = NFTablesManager(config)
 # 统计数据缓存
 stats_cache = {'data': {}, 'timestamp': 0}
 CACHE_TTL = 1  # 缓存有效期（秒）
+
+
+# ===== 前端页面路由 =====
+@app.route('/')
+def dashboard():
+    """渲染监控面板主页"""
+    return render_template('dashboard.html')
+
+
+@app.route('/static/<path:filename>')
+def serve_static(filename):
+    """提供静态文件"""
+    return send_from_directory(app.static_folder, filename)
 
 
 @app.route('/api/health', methods=['GET'])
@@ -228,7 +247,7 @@ def load_config():
     filepath = data.get('filepath', '/etc/nftables_defense_config.json')
     
     try:
-        config = DefenseConfig.load(filepath)
+        config = RLDefenseConfig.load(filepath)
         manager = NFTablesManager(config)
         return jsonify({
             'success': True,
@@ -308,7 +327,7 @@ def reset_to_default():
     """重置为默认参数"""
     global manager
     
-    manager = NFTablesManager(DefenseConfig())
+    manager = NFTablesManager(RLDefenseConfig())
     success = manager.apply_rules()
     
     return jsonify({

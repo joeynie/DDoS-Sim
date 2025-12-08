@@ -31,14 +31,19 @@ COPY defense_api.py /app/
 COPY start-defender.sh /usr/local/bin/start-defender.sh
 COPY packet_monitor.py /usr/local/bin/packet_monitor.py
 
+# 复制前端文件
+COPY templates/ /app/templates/
+COPY static/ /app/static/
+
 # 设置执行权限
 RUN chmod +x /usr/local/bin/start-defender.sh
 RUN chmod +x /usr/local/bin/packet_monitor.py
 
-WORKDIR /usr/local/bin
+WORKDIR /app
 
 # 暴露API端口
 EXPOSE 5000
 
 # 启动命令
 CMD ["sh", "/usr/local/bin/start-defender.sh"]
+# CMD ["tail", "-f", "/dev/null"]
