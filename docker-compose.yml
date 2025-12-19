@@ -95,6 +95,23 @@ services:
       victim_net:
         ipv4_address: 10.10.20.5
 
+  # rl_agent:
+  #   build: ./rl_agent
+  #   hostname: rl_agent
+  #   container_name: rl_agent
+  #   environment:
+  #     - DEFENDER_URL=http://defender:5000
+  #     - MODEL_PATH=/app/models/ppo_ddos_defense
+  #     - TRAINING_STEPS=5000
+  #     - MODE=train  # 'train' 或 'inference'
+  #   volumes:
+  #     - ./models:/app/models  # 持久化模型
+  #   depends_on:
+  #     - defender
+  #   networks:
+  #     - attack_net
+  #     - victim_net
+
 networks:
   attack_net:
     driver: bridge

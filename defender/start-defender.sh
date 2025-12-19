@@ -33,12 +33,8 @@ nft flush ruleset 2>/dev/null || true
 iptables -F 2>/dev/null || true
 iptables -t nat -F 2>/dev/null || true
 
-# 4. 设置基本NAT（使用iptables，因为nftables的NAT需要额外配置）
-echo "[4/6] 配置NAT..."
-iptables -t nat -A POSTROUTING -o eth1 -j MASQUERADE
-
-# 5. 应用NFTables防御规则
-echo "[5/6] 应用NFTables防御规则..."
+# 4. 应用NFTables防御规则（包含 NAT）
+echo "[4/6] 应用NFTables防御规则（包含 NAT）..."
 cd /app
 python3 -c "
 from nftables_config import RLDefenseConfig, NFTablesManager
@@ -62,6 +58,10 @@ else:
     print('NFTables规则应用失败!')
     exit(1)
 "
+
+# 5. 验证 NAT 规则
+echo "[5/6] 验证 NAT 规则..."
+nft list chain inet defense postrouting | grep -q "masquerade" && echo "  ✓ NAT 规则已生效" || echo "  ⚠ NAT 规则未找到"
 
 # 6. 启动API服务
 echo "[6/6] 启动防御API服务..."

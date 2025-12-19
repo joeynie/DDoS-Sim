@@ -65,9 +65,11 @@ ps by nx：之后可以换个port，与僵尸网络错开；以及c2应该可以
 
 ### 在defender上实时获取收到的所有包的信息
 注：请单开一个终端，运行以下代码；同时可以在原终端中攻击，查看结果
+```bash
 docker-compose up -d --build
 docker exec -it defender bash
 python3 packet_monitor.py -i eth0
+```
 
 ### 控制 NFTables 防御 (手动/API)
 
@@ -85,6 +87,22 @@ curl -X POST http://localhost:5001/api/params/update \
 ```
 
 
-## 测试访问
+### 测试访问
 - 攻击前后，浏览器访问: http://localhost:8888/api/status
 - 观察响应时间和可用性变化
+
+
+## 🆕 新功能：强化学习自适应防御
+
+本系统现已集成**强化学习（RL）**功能，可自动学习和调整防御参数！
+
+### 快速启动 RL 防御
+```bash
+docker-compose up -d
+docker-compose logs -f rl_agent
+```
+
+### 访问面板
+- 🎯 Victim 服务: http://localhost:8888
+- 🛡️ Defender 面板: http://localhost:5001
+- 🤖 C&C 控制台: http://localhost:5000

@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 用户流量模拟器
-模拟正常用户的网络活动，发送少量的TCP和UDP包给victim服务器
+模拟正常用户的网络活动，发送随机数量的TCP和UDP包给victim服务器。
 通过defender转发，设置TTL为33
 """
 
@@ -16,213 +16,148 @@ class UserTrafficSimulator:
         self.victim_ip = victim_ip
         self.tcp_port = tcp_port
         self.udp_port = udp_port
-
-        # TTL设置为33（用户要求的）
         self.ttl = 33
 
-        print("🏠 用户流量模拟器启动")
+        print("🏠 用户流量模拟器启动 (背景流量生成)")
         print(f"🎯 目标: {victim_ip}")
         print(f"🔌 TCP端口: {tcp_port}, UDP端口: {udp_port}")
-        print(f"⏰ TTL: {self.ttl}")
+        print(f"⏰ Ground Truth TTL: {self.ttl}")
         print("-" * 50)
 
-    def send_tcp_packets(self, count=3):
-        """发送少量TCP包到victim的TCP服务器"""
-        print(f"\n🔄 发送 {count} 个TCP包到 {self.victim_ip}:{self.tcp_port}")
-
+    def send_tcp_packets(self, count):
+        """发送随机数量的TCP包"""
+        success = 0
         for i in range(count):
             try:
-                # 创建TCP socket
                 sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-
-                # 设置TTL
                 sock.setsockopt(socket.IPPROTO_IP, socket.IP_TTL, self.ttl)
+                sock.settimeout(3.0) # 缩短超时，避免阻塞太久
 
-                # 设置超时
-                sock.settimeout(5.0)
-
-                print(f"  [{i+1}] 连接到 {self.victim_ip}:{self.tcp_port}...")
-
-                # 连接到victim
-                start_time = time.time()
+                # 连接
                 sock.connect((self.victim_ip, self.tcp_port))
-                connect_time = time.time() - start_time
+                
+                # 构造随机请求
+                endpoints = ["/", "/index.html", "/api/status", "/login", "/static/style.css"]
+                user_agents = ["Mozilla/5.0", "Chrome/90.0", "Safari/14.0"]
+                
+                request = (
+                    f"GET {random.choice(endpoints)} HTTP/1.1\r\n"
+                    f"Host: {self.victim_ip}\r\n"
+                    f"User-Agent: {random.choice(user_agents)}\r\n"
+                    f"Connection: close\r\n\r\n"
+                ).encode('utf-8')
 
-                print(f"      ✓ 连接成功 ({connect_time:.3f}s)")
-
-                # 发送数据
-                messages = [
-                    "Hello from normal user!",
-                    "This is a legitimate TCP request",
-                    "Normal user activity simulation",
-                    "Testing connection to server",
-                    "User browsing the website"
-                ]
-
-                message = random.choice(messages)
-                data = f"USER_TCP_REQUEST: {message}\n".encode('utf-8')
-
-                sock.send(data)
-                print(f"      📤 发送: {data.decode().strip()}")
-
-                # 接收响应
-                response = sock.recv(1024)
-                print(f"      📥 响应: {response.decode().strip()[:50]}...")
-
-                # 随机等待1-3秒，模拟用户行为
-                wait_time = random.uniform(1, 3)
-                print(f"      ⏱️  等待 {wait_time:.1f}秒...")
-                time.sleep(wait_time)
-
+                sock.send(request)
+                
+                # 读取少量响应即可
+                sock.recv(512)
                 sock.close()
-                print(f"      ✓ TCP包 {i+1} 发送完成")
+                success += 1
+                
+                # 极短的微观间隔，模拟突发请求
+                time.sleep(random.uniform(0.05, 0.2))
 
-            except socket.timeout:
-                print(f"      ✗ TCP包 {i+1} 超时")
-            except socket.error as e:
-                print(f"      ✗ TCP包 {i+1} 错误: {e}")
-            except Exception as e:
-                print(f"      ✗ TCP包 {i+1} 未知错误: {e}")
+            except Exception:
+                # 正常流量偶尔也会丢包或超时，这是正常的，不用打印错误堆栈
+                pass
+        
+        return success
 
-    def send_udp_packets(self, count=5):
-        """发送少量UDP包到victim的UDP服务器"""
-        print(f"\n📡 发送 {count} 个UDP包到 {self.victim_ip}:{self.udp_port}")
-
+    def send_udp_packets(self, count):
+        """发送随机数量的UDP包"""
+        success = 0
         for i in range(count):
             try:
-                # 创建UDP socket
                 sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-
-                # 设置TTL
                 sock.setsockopt(socket.IPPROTO_IP, socket.IP_TTL, self.ttl)
+                sock.settimeout(1.0)
 
-                # 设置超时
-                sock.settimeout(2.0)
+                messages = ["DNS", "NTP", "KeepAlive", "GameSync", "Heartbeat"]
+                data = f"USER_UDP:{random.choice(messages)}|{time.time()}".encode('utf-8')
 
-                messages = [
-                    "DNS query from user",
-                    "NTP time sync request",
-                    "Gaming heartbeat packet",
-                    "VoIP audio data",
-                    "User UDP traffic test"
-                ]
-
-                message = random.choice(messages)
-                data = f"USER_UDP_PACKET: {message} | SEQ:{i+1} | TIME:{datetime.now().strftime('%H:%M:%S')}".encode('utf-8')
-
-                print(f"  [{i+1}] 发送UDP包: {data.decode()[:50]}...")
-
-                # 发送UDP包
                 sock.sendto(data, (self.victim_ip, self.udp_port))
-
-                # 尝试接收响应（UDP echo服务器会回复）
+                
+                # 尝试接收，但不强求
                 try:
-                    response, addr = sock.recvfrom(1024)
-                    print(f"      📥 响应: {response.decode()[:50]}...")
+                    sock.recvfrom(512)
                 except socket.timeout:
-                    print(f"      📭 无响应（正常）")
-
-                # 随机等待0.5-2秒
-                wait_time = random.uniform(0.5, 2)
-                print(f"      ⏱️  等待 {wait_time:.1f}秒...")
-                time.sleep(wait_time)
-
+                    pass
+                
                 sock.close()
-                print(f"      ✓ UDP包 {i+1} 发送完成")
+                success += 1
+                time.sleep(random.uniform(0.05, 0.2))
 
-            except socket.error as e:
-                print(f"      ✗ UDP包 {i+1} 错误: {e}")
-            except Exception as e:
-                print(f"      ✗ UDP包 {i+1} 未知错误: {e}")
+            except Exception:
+                pass
+        
+        return success
 
-    def run_simulation(self, cycles=10, cycle_interval=10):
+    def run_simulation(self, base_interval=5):
         """
-        运行模拟
-        :param cycles: 循环次数
-        :param cycle_interval: 每次循环间隔（秒）
+        运行无限模拟循环
+        :param base_interval: 基础循环间隔（秒）
         """
-        print(f"\n🚀 开始用户流量模拟")
-        print(f"🔄 循环次数: {cycles}")
-        print(f"⏱️  循环间隔: {cycle_interval}秒")
+        print(f"\n🚀 开始无限循环模拟")
+        print(f"⏱️  基础间隔: {base_interval}秒 (含随机抖动)")
         print("=" * 50)
 
+        cycle = 0
         try:
-            for cycle in range(cycles):
-                print(f"\n🎯 循环 {cycle + 1}/{cycles} - {datetime.now().strftime('%H:%M:%S')}")
+            while True:
+                cycle += 1
+                
+                # 1. 随机化流量大小 (关键点：让AI学会适应波动)
+                # 有时候流量很小 (1-3个)，有时候流量突然变大 (10-20个)
+                # 模拟"忙时"和"闲时"
+                traffic_scale = random.choice([1.0, 1.5, 2.0, 0.5]) 
+                
+                n_tcp = int(random.randint(3, 15) * traffic_scale)
+                n_udp = int(random.randint(2, 8) * traffic_scale)
 
-                # 发送TCP包（3个）
-                self.send_tcp_packets(3)
+                print(f"[{datetime.now().strftime('%H:%M:%S')}] Cycle {cycle}: 发送 {n_tcp} TCP, {n_udp} UDP...", end="", flush=True)
 
-                # 发送UDP包（5个）
-                self.send_udp_packets(5)
+                # 2. 执行发送
+                tcp_ok = self.send_tcp_packets(n_tcp)
+                udp_ok = self.send_udp_packets(n_udp)
 
-                if cycle < cycles - 1:
-                    print(f"\n💤 等待 {cycle_interval}秒后开始下一轮...")
-                    time.sleep(cycle_interval)
-                else:
-                    print("✅ 所有循环完成！")     
+                print(f" 完成 (TCP:{tcp_ok}/{n_tcp}, UDP:{udp_ok}/{n_udp})")
+
+                # 3. 随机化间隔 (Jitter)
+                # 在 base_interval 基础上增加 +/- 50% 的抖动
+                # 避免产生固定的频率特征被 RL 过拟合
+                jitter = base_interval * 0.5
+                wait_time = random.uniform(base_interval - jitter, base_interval + jitter)
+                
+                # 偶尔模拟长等待
+                if random.random() < 0.05: # 5%概率
+                    print("   (User idle...)")
+                    wait_time += 10
+
+                time.sleep(max(0.5, wait_time))
+
         except KeyboardInterrupt:
-            print("\n🛑 用户中断模拟")
+            print("\n🛑 模拟停止")
         except Exception as e:
-            print(f"\n❌ 模拟错误: {e}")
-
-    def interactive_mode(self):
-        """交互模式"""
-        print("\n🎮 交互模式 - 选择要发送的流量类型:")
-        print("1. 发送TCP包")
-        print("2. 发送UDP包")
-        print("3. 运行完整模拟")
-        print("4. 退出")
-
-        while True:
-            try:
-                choice = input("\n请选择 (1-4): ").strip()
-
-                if choice == "1":
-                    count = int(input("输入TCP包数量 (默认3): ") or "3")
-                    self.send_tcp_packets(count)
-                elif choice == "2":
-                    count = int(input("输入UDP包数量 (默认5): ") or "5")
-                    self.send_udp_packets(count)
-                elif choice == "3":
-                    cycles = int(input("输入循环次数 (默认5): ") or "5")
-                    interval = int(input("输入循环间隔(秒，默认10): ") or "10")
-                    self.run_simulation(cycles, interval)
-                    break
-                elif choice == "4":
-                    break
-                else:
-                    print("❌ 无效选择，请重新输入")
-
-            except ValueError:
-                print("❌ 请输入有效的数字")
-            except KeyboardInterrupt:
-                print("\n👋 再见!")
-                break
+            print(f"\n❌ 发生错误: {e}")
 
 def main():
     import argparse
-
-    parser = argparse.ArgumentParser(description='用户流量模拟器')
-    parser.add_argument('--victim-ip', default='10.10.20.20', help='受害者IP地址')
-    parser.add_argument('--tcp-port', type=int, default=80, help='TCP端口')
-    parser.add_argument('--udp-port', type=int, default=9999, help='UDP端口')
-    parser.add_argument('--cycles', type=int, default=10, help='模拟循环次数')
-    parser.add_argument('--interval', type=int, default=10, help='循环间隔(秒)')
-    parser.add_argument('--interactive', action='store_true', help='启用交互模式')
-
+    parser = argparse.ArgumentParser(description='用户流量模拟器 (随机化版)')
+    parser.add_argument('--victim-ip', default='10.10.20.20', help='受害者IP')
+    parser.add_argument('--interval', type=float, default=5.0, help='平均发送间隔(秒)')
+    
     args = parser.parse_args()
+
+    # 稍微随机等待一下启动，避免所有容器同时发起网络请求
+    time.sleep(random.uniform(1, 3))
 
     simulator = UserTrafficSimulator(
         victim_ip=args.victim_ip,
-        tcp_port=args.tcp_port,
-        udp_port=args.udp_port
+        tcp_port=80,
+        udp_port=9999
     )
 
-    if args.interactive:
-        simulator.interactive_mode()
-    else:
-        simulator.run_simulation(args.cycles, args.interval)
+    simulator.run_simulation(base_interval=args.interval)
 
 if __name__ == "__main__":
     main()

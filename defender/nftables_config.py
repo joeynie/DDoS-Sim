@@ -108,6 +108,11 @@ class NFTablesManager:
             "        ip protocol udp jump handle_accept",
             "        ip protocol icmp jump handle_accept",
             "    }",
+            "",
+            "    chain postrouting {",
+            "        type nat hook postrouting priority srcnat; policy accept;",
+            "        oifname \"eth1\" masquerade",
+            "    }",    # add NAT rule 
             "}"
         ]
         return "\n".join(rules)

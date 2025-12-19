@@ -88,7 +88,7 @@ docker logs -f user
 ### 在defender中查看包
 ```bash
 # 进入defender查看实时包监控
-docker exec -it defender python3 /usr/local/bin/packet_monitor.py -i any
+docker exec -it defender python3 ./packet_monitor.py -i any
 ```
 
 ### 检查网络连接

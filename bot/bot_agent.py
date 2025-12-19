@@ -229,8 +229,6 @@ def generate_bot_id():
     # 使用容器的 hostname（Docker Compose replicas 会自动分配唯一的 hostname）
     hostname = socket.gethostname()
     
-    # hostname 通常是容器 ID 的前12位，格式如 "ddos-sim-bot-1"
-    # 或者是短容器 ID 如 "a1b2c3d4e5f6"
     return f"bot-{hostname}"
 
 def main():

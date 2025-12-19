@@ -6,10 +6,12 @@ NFTables 防御系统 HTTP API
 
 from flask import Flask, request, jsonify, render_template, send_from_directory
 from nftables_config import RLDefenseConfig, NFTablesManager
+from packet_monitor import PacketAnalyzer
 import threading
 import time
 import logging
 import os
+import psutil
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
@@ -24,6 +26,10 @@ app = Flask(__name__,
 # 全局管理器实例
 config = RLDefenseConfig()
 manager = NFTablesManager(config)
+
+# 全局 PacketAnalyzer 实例（直接启动）
+packet_analyzer = PacketAnalyzer()
+packet_analyzer.start_monitoring()
 
 # 统计数据缓存
 stats_cache = {'data': {}, 'timestamp': 0}
@@ -265,27 +271,62 @@ def get_rl_state():
     """获取强化学习状态向量
     
     返回当前系统状态，包括:
-    - 当前参数值
-    - 流量统计
-    - 攻击检测指标
+    - 战况反馈 (拦截率、误杀率)
+    - 敌情特征 (异常流量占比、协议分布、IP 分布)
+    - 自身状态 (CPU、流量强度)
+    - 当前策略参数
     """
     params = manager.get_all_params()
     stats = manager.get_statistics()
     
-    # 构建状态向量
-    state = {
-        'params': params,
-        'counters': stats.get('counters', {}),
-        'sets': {
-            name: info.get('count', 0) 
-            for name, info in stats.get('sets', {}).items()
-        },
-        'conntrack_count': stats.get('conntrack_count', 0)
+    # 获取 nftables 计数器
+    counters = stats.get('counters', {})
+    tp = counters.get('tp_count', 0)
+    fp = counters.get('fp_count', 0)
+    tn = counters.get('tn_count', 0)
+    fn = counters.get('fn_count', 0)
+    
+    # 计算战况反馈
+    total_attack = tp + fn  # 所有攻击
+    total_normal = fp + tn  # 所有正常
+    
+    attack_drop_rate = tp / total_attack if total_attack > 0 else 0.0  # 拦截率
+    normal_drop_rate = fp / total_normal if total_normal > 0 else 0.0  # 误杀率
+    
+    # 获取 CPU 负载
+    cpu_load = psutil.cpu_percent(interval=0.1) / 100.0  # 归一化到 [0, 1]
+    
+    # 从 packet_analyzer 获取实时流量特征
+    traffic_features = packet_analyzer.get_rl_observation()
+    
+    # 构建 RL 观察
+    obs_json = {
+        # 战况反馈
+        'attack_drop_rate': attack_drop_rate,
+        'normal_drop_rate': normal_drop_rate,
+        
+        # 敌情特征
+        'abnormal_ratio': traffic_features.get('ttl_abnormal_ratio', 0.0),
+        'syn_ratio': traffic_features.get('syn_ratio', 0.0),
+        'udp_ratio': traffic_features.get('udp_ratio', 0.0),
+        'max_ip_ratio': traffic_features.get('max_ip_ratio', 0.0),
+        
+        # 自身状态
+        'cpu_load': cpu_load,
+        'traffic_intensity': traffic_features.get('total_pps', 0.0),
+        
+        # 当前策略参数
+        'curr_global_limit': params.get('global_limit', 10000),
+        'curr_single_ip_limit': params.get('single_ip_limit', 100),
+        'curr_conn_limit': params.get('conn_limit', 50)
     }
     
     return jsonify({
         'success': True,
-        'state': state
+        'state': {
+            'obs': obs_json,
+            'counters': counters
+        }
     })
 
 
@@ -352,4 +393,5 @@ if __name__ == '__main__':
         manager.apply_rules()
     
     logger.info(f"API服务启动在 {args.host}:{args.port}")
+    logger.info("Packet Monitor 已启动")
     app.run(host=args.host, port=args.port, threaded=True)

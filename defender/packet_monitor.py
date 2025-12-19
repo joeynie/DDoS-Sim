@@ -43,7 +43,17 @@ class PacketAnalyzer:
         # 额外的窗口统计结构：
         # key: src_ip, value: {'count': int, 'bytes': int, 'proto_tcp_count': int, 'proto_udp_count': int}
         self.ip_traffic_stats = defaultdict(lambda: defaultdict(int))
-        self.ttl_counts = defaultdict(int) # key: TTL value, value: count
+        # TTL 计数器：normal (TTL=33 正常用户) 和 attack (TTL=64 攻击源)
+        self.ttl_counts = {'normal': 0, 'attack': 0}
+        
+        # RL 特征缓存（供 API 调用）
+        self.latest_features = {
+            "syn_ratio": 0.0,
+            "udp_ratio": 0.0,
+            "ttl_abnormal_ratio": 0.0,
+            "max_ip_ratio": 0.0,
+            "total_pps": 0.0
+        }
 
     def analyze_packet(self, packet):
         """分析单个数据包"""
@@ -122,11 +132,21 @@ class PacketAnalyzer:
                 elif proto_name == 'UDP':
                     self.ip_traffic_stats[src_ip]['proto_udp_count'] += 1
 
-                # 3. 更新TTL计数 (只关注 33 和 63)
-                if ip.ttl == 32 or ip.ttl == 63:
-                    self.ttl_counts[ip.ttl] += 1
+                # 3. 更新流量来源计数（只统计去程包，避免混入回程响应）
+                # 判断是否来自 attack_net (10.10.10.x)
+                is_from_attack_net = src_ip.startswith('10.10.10.')
+                
+                if ip.ttl == 33 and is_from_attack_net:
+                    self.ttl_counts['normal'] += 1
+                elif ip.ttl == 64 and is_from_attack_net:
+                    self.ttl_counts['attack'] += 1
 
         return packet_info
+
+    def get_rl_observation(self):
+        """供外部 API 调用，返回当前的 RL 特征快照"""
+        with self.stats_lock:
+            return self.latest_features.copy()
 
     def get_window_stats(self, window_seconds):
         """获取当前窗口的统计摘要，并重置计数器"""
@@ -146,14 +166,40 @@ class PacketAnalyzer:
                     'udp_count': stats['proto_udp_count']
                 })
 
-            # 3. 计算 TTL 比例
-            ttl_33_count = self.ttl_counts[32]
-            ttl_63_count = self.ttl_counts[63]
-            ttl_ratio = float('inf')
-            if ttl_63_count > 0:
-                ttl_ratio = ttl_33_count / ttl_63_count
-            elif ttl_33_count > 0:
-                 ttl_ratio = ttl_33_count # 63为0时，等同于33的包数
+            # 3. 计算流量来源统计（正常用户 vs 攻击源）
+            normal_count = self.ttl_counts['normal']  # TTL=33 正常用户
+            attack_count = self.ttl_counts['attack']  # TTL=64 攻击源
+            total_ttl_count = normal_count + attack_count
+            
+            # 计算攻击流量占比
+            attack_ratio = 0.0
+            if total_ttl_count > 0:
+                attack_ratio = attack_count / total_ttl_count
+            
+            # 4. 计算 RL 特征（供 API 调用）
+            # 协议比例
+            syn_count = self.packet_stats_window.get('proto_TCP', 0)  # 简化：TCP 包视为可能包含 SYN
+            udp_count = self.packet_stats_window.get('proto_UDP', 0)
+            total_for_ratio = max(1, total_packets)  # 防止除零
+            
+            syn_ratio = syn_count / total_for_ratio
+            udp_ratio = udp_count / total_for_ratio
+            ttl_abnormal_ratio = attack_ratio  # 异常流量即攻击流量
+            
+            # 单 IP 最大发包占比
+            max_ip_count = 0
+            if self.ip_traffic_stats:
+                max_ip_count = max(stats['count'] for stats in self.ip_traffic_stats.values())
+            max_ip_ratio = max_ip_count / total_for_ratio
+            
+            # 更新特征缓存
+            self.latest_features = {
+                "syn_ratio": syn_ratio,
+                "udp_ratio": udp_ratio,
+                "ttl_abnormal_ratio": ttl_abnormal_ratio,
+                "max_ip_ratio": max_ip_ratio,
+                "total_pps": pps
+            }
 
             # 4. 排序 TCP/UDP 流量
             
@@ -180,9 +226,9 @@ class PacketAnalyzer:
                 
                 # 新增聚合特征
                 'ip_traffic_summary': ip_stats_list,
-                'ttl_33_count': ttl_33_count,
-                'ttl_63_count': ttl_63_count,
-                'ttl_33_to_63_ratio': ttl_ratio,
+                'normal_traffic_count': normal_count,
+                'attack_traffic_count': attack_count,
+                'attack_traffic_ratio': attack_ratio,
                 'top_tcp_ips': [{'ip': d['ip'], 'count': d['tcp_count']} for d in top_tcp_ips if d['tcp_count'] > 0],
                 'top_udp_ips': [{'ip': d['ip'], 'count': d['udp_count']} for d in top_udp_ips if d['udp_count'] > 0]
             }
@@ -190,9 +236,30 @@ class PacketAnalyzer:
             # 重置所有计数器，实现窗口化统计
             self.packet_stats_window.clear()
             self.ip_traffic_stats.clear()
-            self.ttl_counts.clear()
+            self.ttl_counts = {'normal': 0, 'attack': 0}
             
             return summary
+
+    def start_monitoring(self):
+        """启动后台包监控（同时启动捕获和显示线程）"""
+        # 启动显示线程
+        display_thread = threading.Thread(target=display_packets, args=(self,), daemon=True)
+        display_thread.start()
+        
+        # 启动包捕获线程（在后台持续捕获）
+        def sniff_thread():
+            global running
+            filter_expr = "ip"
+            promisc = True
+            sniff(iface='any', 
+                  prn=lambda p: packet_callback(p, self), 
+                  filter=filter_expr,
+                  store=0, 
+                  promisc=promisc,
+                  stop_filter=stop_sniffing)
+        
+        sniff_t = threading.Thread(target=sniff_thread, daemon=True)
+        sniff_t.start()
 
 def packet_callback(packet, analyzer_instance):
     """Scapy包回调函数，接受分析器实例"""
@@ -249,14 +316,14 @@ def display_packets(analyzer_instance):
                 stats = analyzer_instance.get_window_stats(WINDOW_SECONDS)
                 
                 # 清屏以提供更清晰的窗口视图 (可选，但推荐在实时监控中使用)
-                # os.system('clear' if os.name == 'posix' else 'cls') 
+                os.system('clear' if os.name == 'posix' else 'cls') 
                 # 重新打印表头
                 # print(f"\n{'='*120}\n{'🔍 DEFENDER 实时包监控器':^120}\n{'='*120}")
-                # print(f"{'时间':<12} {'协议':<6} {'源IP':<15} {'目的IP':<15} {'源端口':<8} {'目的端口':<10} {'标志':<12} {'长度':<6} {'TTL':<5}")
+                print(f"{'时间':<12} {'协议':<6} {'源IP':<15} {'目的IP':<15} {'源端口':<8} {'目的端口':<10} {'标志':<12} {'长度':<6} {'TTL':<5}")
                 # print("-"*120)
 
 
-                print(f"\n{'='*60} 📊 窗口统计信息 ({WINDOW_SECONDS:.1f}秒) {'='*60}")
+                print(f"\n{'='*50} 📊 窗口统计信息 ({WINDOW_SECONDS:.1f}秒) {'='*50}")
                 # 基础统计
                 print(f" 📦 周期总包数: {stats['total_packets']} | 周期 PPS: {stats['packets_per_second']:.1f}")
                 print(f" 🚀 协议分布: {stats['protocols']}")
@@ -274,12 +341,12 @@ def display_packets(analyzer_instance):
                 print("-"*120)
 
 
-                # 2. TTL 比例 (恶意流量判断依据)
-                ttl_ratio_str = f"{stats['ttl_33_to_63_ratio']:.2f}" if stats['ttl_33_to_63_ratio'] != float('inf') else "Inf"
-                print(f" ⚠️ TTL 32 vs 62 比例分析 (TTL 32 / TTL 63):")
-                print(f"   TTL 32 计数 (去程攻击): {stats['ttl_33_count']}")
-                print(f"   TTL 63 计数 (回程响应): {stats['ttl_63_count']}")
-                print(f"   TTL 比例: {ttl_ratio_str} (比率过高可能表明攻击/扫描流量占主导)")
+                # 2. TTL 流量来源分析（正常用户 vs 攻击源）
+                attack_ratio = stats['attack_traffic_ratio']
+                print(f" ⚠️ 流量来源分析 (基于 TTL 特征):")
+                print(f"   正常用户流量 (TTL=33): {stats['normal_traffic_count']} 包")
+                print(f"   攻击源流量 (TTL=64): {stats['attack_traffic_count']} 包")
+                print(f"   攻击流量占比: {attack_ratio:.2%} (占比越高表明攻击流量越多)")
                 print("-"*120)
 
 
@@ -324,7 +391,7 @@ def stop_sniffing(packet):
 
 def main():
     parser = argparse.ArgumentParser(description='Defender实时包监控器')
-    parser.add_argument('-i', '--interface', default='any', help='监听的网络接口 (默认: any)')
+    parser.add_argument('-i', '--interface', default='eth0', help='监听的网络接口 (默认: eth0)')
     parser.add_argument('-f', '--filter', default='', help='BPF过滤器表达式')
     parser.add_argument('--no-promisc', action='store_true', help='不使用混杂模式')
 
@@ -345,7 +412,7 @@ def main():
     # 启动显示线程，并将分析器实例传入
     display_thread = threading.Thread(target=display_packets, args=(analyzer,), daemon=True)
     display_thread.start()
-
+    global running
     try:
         filter_expr = args.filter if args.filter else "ip"
         promisc = not args.no_promisc
