@@ -137,7 +137,7 @@ def main():
         print("用法: python3 udp_amplification_9999.py <target_ip> [threads] [duration] [amplification]")
         print("\n示例:")
         print("  python3 udp_amplification_9999.py 10.10.20.20")
-        print("  python3 udp_amplification_9999.py 10.10.20.20 50 60 100")
+        print("  python3 udp_amplification_9999.py 10.10.20.20 50 0 100")
         print("\n参数说明:")
         print("  target_ip       目标IP地址")
         print("  threads         线程数 (默认: 50)")

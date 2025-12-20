@@ -106,9 +106,7 @@ class UserTrafficSimulator:
             while True:
                 cycle += 1
                 
-                # 1. 随机化流量大小 (关键点：让AI学会适应波动)
-                # 有时候流量很小 (1-3个)，有时候流量突然变大 (10-20个)
-                # 模拟"忙时"和"闲时"
+                # 1. 随机化流量大小 
                 traffic_scale = random.choice([1.0, 1.5, 2.0, 0.5]) 
                 
                 n_tcp = int(random.randint(3, 15) * traffic_scale)
@@ -123,8 +121,6 @@ class UserTrafficSimulator:
                 print(f" 完成 (TCP:{tcp_ok}/{n_tcp}, UDP:{udp_ok}/{n_udp})")
 
                 # 3. 随机化间隔 (Jitter)
-                # 在 base_interval 基础上增加 +/- 50% 的抖动
-                # 避免产生固定的频率特征被 RL 过拟合
                 jitter = base_interval * 0.5
                 wait_time = random.uniform(base_interval - jitter, base_interval + jitter)
                 

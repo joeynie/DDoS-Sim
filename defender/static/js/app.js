@@ -164,6 +164,16 @@ async function fetchAndUpdateStats() {
     } catch (err) {
         updateConnectionStatus(false);
     }
+    
+    // 同时获取最新参数，确保RL更新的参数也能显示
+    try {
+        const paramsRes = await api.get('/api/params');
+        if (paramsRes.success) {
+            updateParamInputs(paramsRes.params);
+        }
+    } catch (err) {
+        console.warn('Failed to sync params:', err);
+    }
 }
 
 function updateStats(stats) {
@@ -507,6 +517,10 @@ async function initRulesConfig() {
         try {
             const res = await api.post('/api/rl/action', { actions: params });
             if (res.success) {
+                // 应用成功后，立即刷新参数显示
+                if (res.new_state) {
+                    updateParamInputs(res.new_state);
+                }
                 showToast('规则已成功应用', 'success');
             } else {
                 showToast('规则应用失败: ' + res.message, 'error');

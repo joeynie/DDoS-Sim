@@ -144,7 +144,7 @@ class NFTablesManager:
             cmd = ['nft', 'list', 'counters', 'table', 'inet', 'defense']
             res = subprocess.run(cmd, capture_output=True, text=True)
             
-            logger.info(f"NFT counters output:\n{res.stdout}")
+            # logger.info(f"NFT counters output:\n{res.stdout}")
             
             if res.returncode == 0:
                 # 使用正则表达式提取，无视换行符

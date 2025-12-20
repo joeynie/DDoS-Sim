@@ -251,7 +251,7 @@ class PacketAnalyzer:
             global running
             filter_expr = "ip"
             promisc = True
-            sniff(iface='any', 
+            sniff(iface='eth0', 
                   prn=lambda p: packet_callback(p, self), 
                   filter=filter_expr,
                   store=0, 
@@ -267,6 +267,13 @@ def packet_callback(packet, analyzer_instance):
 
     # 仅将 IP 层的数据包发送给分析器，忽略 L2 帧
     if packet.haslayer(IP):
+        ip = packet[IP]
+        
+        # 过滤掉网关流量（Docker网关地址）
+        GATEWAY_IPS = {'10.10.10.1', '10.10.20.1'}
+        if ip.src in GATEWAY_IPS or ip.dst in GATEWAY_IPS:
+            return 
+        
         packet_info = analyzer_instance.analyze_packet(packet)
 
         if packet_info:
@@ -333,7 +340,7 @@ def display_packets(analyzer_instance):
                 print(f" 🌐 源IP流量统计 (PPS/BPS):")
                 if stats['ip_traffic_summary']:
                     # 打印表头
-                    print(f"{'IP 地址':<15} | {'总包数':<8} | {'PPS':<8} | {'BPS (Bytes/s)':<15}")
+                    print(f"{'IP 地址':<13} | {'总包数':<6} | {'PPS':<3} | {'BPS (Bytes/s)':<15}")
                     for d in stats['ip_traffic_summary']:
                          print(f"{d['ip']:<15} | {d['tcp_count'] + d['udp_count']:<8} | {d['pps']:.2f} | {d['bps']:.2f}")
                 else:

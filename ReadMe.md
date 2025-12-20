@@ -92,14 +92,18 @@ curl -X POST http://localhost:5001/api/params/update \
 - 观察响应时间和可用性变化
 
 
-## 🆕 新功能：强化学习自适应防御
-
-本系统现已集成**强化学习（RL）**功能，可自动学习和调整防御参数！
+## 🆕 强化学习自适应防御
 
 ### 快速启动 RL 防御
+- docker版
 ```bash
 docker-compose up -d
 docker-compose logs -f rl_agent
+```
+- 本地版
+```bash
+# 修改rl_agent/.env， 选择train/infer
+python rl_agent/agent.py
 ```
 
 ### 访问面板
