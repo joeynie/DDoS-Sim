@@ -97,11 +97,10 @@ def test_rl_reset_api(url=None):
         print(f"✗ Error: {e}")
         return False
 
-def show_obs(obs, reward=None):
+def show_obs(obs, reward, episode_reward):
     """Display observation in single line, updating in place"""
     line = f"\r[Obs] ADR={obs[0]:.3f} NDR={obs[1]:.3f} ABN={obs[2]:.3f} SYN={obs[3]:.3f} UDP={obs[4]:.3f} MIR={obs[5]:.3f} CPU={obs[6]:.3f} TI={obs[7]:.3f} GL={obs[8]:.3f} SL={obs[9]:.3f} CL={obs[10]:.3f}"
-    if reward is not None:
-        line += f" | R={reward:.3f}"
+    line += f" | R={reward:.3f} Cum={episode_reward:.3f}"
     print(line, end='', flush=True)
 
 def test_gym_environment():
@@ -119,12 +118,14 @@ def test_gym_environment():
     obs, info = env.reset()
     print("✓ Reset OK")
     
+    episode_reward = 0
     try:
         step = 0
         while True:
             action = env.action_space.sample()
             obs, reward, terminated, truncated, info = env.step(action)
-            show_obs(obs, reward)
+            episode_reward += reward
+            show_obs(obs, reward, episode_reward)
             step += 1
     except KeyboardInterrupt:
         print(f"\n✓ Stopped at step {step}")
