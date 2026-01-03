@@ -29,7 +29,6 @@ COPY static/ /app/static/
 RUN chmod +x /app/packet_monitor.py
 RUN chmod +x /usr/local/bin/start-defender.sh
 
-WORKDIR /app
 EXPOSE 5000
 
 CMD ["sh", "/usr/local/bin/start-defender.sh"]

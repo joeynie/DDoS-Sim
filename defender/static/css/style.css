@@ -432,12 +432,38 @@ body {
     gap: 6px;
     font-size: 13px;
     color: var(--text-secondary);
+    transition: var(--transition);
+}
+
+.legend-item.clickable {
+    cursor: pointer;
+    user-select: none;
+}
+
+.legend-item.clickable:hover {
+    color: var(--text-primary);
+    transform: translateY(-1px);
+}
+
+.legend-item.disabled {
+    opacity: 0.3;
+    text-decoration: line-through;
+}
+
+.legend-item.disabled:hover {
+    opacity: 0.5;
 }
 
 .legend-dot {
     width: 10px;
     height: 10px;
     border-radius: 50%;
+    transition: var(--transition);
+}
+
+.legend-item.clickable:hover .legend-dot {
+    transform: scale(1.2);
+    box-shadow: 0 0 8px currentColor;
 }
 
 .dot-tp { background: var(--success); }

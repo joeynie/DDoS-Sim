@@ -25,6 +25,7 @@ docker-compose up -d --build
 # 进行HTTP攻击
 docker exec -it attacker bash
 python3 http_flood.py http://10.10.20.20/api/status?delay=1000 10 100 60
+python3 http_flood.py http://10.10.20.20/api/status?delay=1000 10 100 0
 
 docker-compose down
 ```
@@ -55,7 +56,7 @@ python3 udp_test_client.py 10.10.20.20 ping
 # 终端2：启动UDP攻击
 docker exec -it attacker bash
 python3 udp_amplification_9999.py 10.10.20.20 50 60 100
-
+python3 udp_amplification_9999.py 10.10.20.20 5 0 10
 docker-compose down
 ```
 

@@ -631,11 +631,36 @@ async function fetchBlacklistStats() {
     }
 }
 
+// ===== 图表图例切换 =====
+function initChartLegendToggle() {
+    const legendItems = $$('.chart-legend .legend-item.clickable');
+    
+    legendItems.forEach(item => {
+        item.addEventListener('click', () => {
+            const datasetIndex = parseInt(item.dataset.dataset);
+            const chart = state.charts.overview;
+            
+            if (!chart) return;
+            
+            // 切换数据集的可见性
+            const meta = chart.getDatasetMeta(datasetIndex);
+            meta.hidden = !meta.hidden;
+            
+            // 更新图例项的视觉状态
+            item.classList.toggle('disabled');
+            
+            // 更新图表
+            chart.update();
+        });
+    });
+}
+
 // ===== 初始化 =====
 document.addEventListener('DOMContentLoaded', () => {
     initNavigation();
     initRefreshControl();
     initCharts();
+    initChartLegendToggle();
     initRulesConfig();
     initBlacklist();
     
